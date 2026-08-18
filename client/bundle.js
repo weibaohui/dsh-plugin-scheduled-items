@@ -311,13 +311,19 @@ window.__ModuleLoader__.load({
 
     module.exports = {
       name: 'scheduled-items-client',
-      inject: ['slots', 'locale'],
+      // Only `slots` is a resolvable service in the static bundle environment;
+      // `locale` is resolved dynamically below so the plugin never waits on a
+      // service name the web module loader does not serve.
+      inject: ['slots'],
 
       apply(ctx) {
         const slots = ctx.get('slots')
         if (slots === undefined) return
-        const t = ctx.locale.bind(LOCALE_NS)
-        ctx.effect(() => ctx.locale.register(LOCALE_NS, LOCALE_DICT))
+        const locale = ctx.get('locale')
+        const t = locale ? locale.bind(LOCALE_NS) : (key) => key
+        if (locale) {
+          ctx.effect(() => locale.register(LOCALE_NS, LOCALE_DICT))
+        }
 
         // One shared store for both surfaces.
         const store = {
