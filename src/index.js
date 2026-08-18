@@ -146,6 +146,22 @@ module.exports = {
           sessionId,
           meta: { cwd: workspace ? workspace.path : defaultCwd },
           agentOptions: { provider: selection.provider, model: selection.model },
+          // Without a preset mount the fresh session runs with NO tools, so
+          // the model can only answer verbally ("I cannot run shell
+          // commands"). Resolve the deployment's default agent preset and
+          // mount it in setup, exactly like the web gateway does when it
+          // creates a session — this brings in bash/files/web and every
+          // other tool the preset composes.
+          setup: async (agentCtx) => {
+            const presets = ctx.get('agentPresets')
+            if (!presets || typeof presets.resolve !== 'function' || typeof presets.mount !== 'function') {
+              return
+            }
+            const resolved = await presets.resolve(undefined)
+            if (resolved && resolved.id) {
+              await presets.mount(agentCtx, resolved.id)
+            }
+          },
         })
         if (workspace !== undefined) {
           await workspace.attachSession(sessionId)
