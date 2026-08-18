@@ -271,6 +271,16 @@ module.exports = {
         try {
           const url = new URL(req.url || '/', 'http://dsh.local')
           const apiPath = url.pathname.replace(/\/+$/, '')
+          if (req.method === 'GET' && apiPath.endsWith('/scheduled-items/api/workspaces')) {
+            // Workspace options for the client form, served over HTTP so the
+            // client half never depends on renderer-bound props hooks.
+            const registry = ctx.get('workspaceRegistry')
+            const workspaces = registry && typeof registry.list === 'function'
+              ? registry.list().map((workspace) => ({ id: workspace.id, title: workspace.title }))
+              : []
+            sendJson(res, 200, { workspaces })
+            return
+          }
           if (req.method === 'GET' && apiPath.endsWith('/scheduled-items/api')) {
             sendJson(res, 200, { items: list() })
             return

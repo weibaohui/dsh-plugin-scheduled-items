@@ -13,17 +13,18 @@ window.__ModuleLoader__.load({
     /**
      * dsh-plugin-scheduled-items — Client half
      *
-     * Registers two surfaces over the same store:
-     *  - `settings.section` "定时事项" management page, and
-     *  - a `sidebar.footer.action` button opening the same management surface
-     *    as a full-page overlay.
+     * Registers a `settings.section` management page and a `sidebar.footer.action`
+     * button opening the same surface as a full-page overlay. Both render over
+     * one component-local store; data arrives from the Host half through plain
+     * `fetch` on `/scheduled-items/api` (the bundle runs in the real page, not a
+     * sandbox). Workspace options are fetched from the Host's
+     * `/scheduled-items/api/workspaces` route.
      *
-     * Data arrives from the Host half through plain `fetch` on the
-     * `/scheduled-items/api` route (the bundle runs in the real page, not a
-     * sandbox). Workspace options come from the standard `useWorkspaces` prop
-     * seat. UI text is localized through the harness `locale` service
-     * (namespace `settings.scheduledItems`; zh/en dictionaries, active-locale
-     * fallback handled by the service).
+     * Components are zero-argument closures — they never read renderer-bound
+     * props hooks — so the bundle works in any harness client runtime that
+     * serves the `slots` service. UI text is localized through the harness
+     * `locale` service (namespace `settings.scheduledItems`) when present,
+     * falling back to raw keys otherwise.
      *
      * This file is the dynamic-plugin source of truth; `client/bundle.js` is
      * the static-install artifact regenerated from it via `npm run build:client`.
@@ -44,7 +45,6 @@ window.__ModuleLoader__.load({
       save: '保存',
       saving: '保存中…',
       cancel: '取消',
-      deleting: '删除中…',
       delete: '删除',
       running: '执行中…',
       runNow: '立即执行',
@@ -81,7 +81,6 @@ window.__ModuleLoader__.load({
       save: 'Save',
       saving: 'Saving…',
       cancel: 'Cancel',
-      deleting: 'Deleting…',
       delete: 'Delete',
       running: 'Running…',
       runNow: 'Run now',
@@ -172,143 +171,6 @@ window.__ModuleLoader__.load({
       return item.lastRunError === undefined ? time : `${time} (${t('failed')}: ${item.lastRunError})`
     }
 
-    /**
-     * Shared management surface: list + create/edit form. Pure presentation —
-     * state and actions arrive through props (bound by the slot renderer).
-     */
-    function ScheduledItemsPanel({ t, state, actions, workspaceOptions }) {
-      const disabled = state.loading || state.saving
-      const rowMeta = (item) => {
-        const parts = []
-        if (item.workspaceId !== undefined) {
-          const option = (workspaceOptions || []).find((o) => o.id === item.workspaceId)
-          parts.push(`${t('workspace')}: ${option ? option.title : item.workspaceId}`)
-        }
-        if (!item.enabled) parts.push(`${t('enabledLabel')}: ✕`)
-        parts.push(`${t('lastRun')}: ${lastRunText(t, item)}`)
-        return parts.join(' · ')
-      }
-      return React.createElement('div', { className: 'si-root' },
-        state.error && React.createElement('p', { className: 'si-error', role: 'alert' },
-          state.error,
-          React.createElement('button', { type: 'button', className: 'si-btn', onClick: () => actions.load() }, t('retry'))
-        ),
-        state.loading && React.createElement('p', { className: 'si-muted' }, t('loading')),
-        !state.loading && state.items.length === 0 && !state.error && React.createElement('p', { className: 'si-muted' }, t('empty')),
-        React.createElement('ul', { className: 'si-list' },
-          state.items.map((item) =>
-            React.createElement('li', { key: item.id, className: 'si-row' },
-              React.createElement('div', { className: 'si-rowMain' },
-                React.createElement('span', { className: 'si-rowTitle' }, item.title),
-                React.createElement('span', { className: 'si-rowCron' }, item.cron),
-                React.createElement('span', { className: 'si-rowMeta' }, rowMeta(item))
-              ),
-              React.createElement('div', { className: 'si-rowActions' },
-                React.createElement('button', {
-                  type: 'button',
-                  className: 'si-btn',
-                  disabled: state.runningId === item.id,
-                  onClick: () => actions.runNow(item.id),
-                }, state.runningId === item.id ? t('running') : t('runNow')),
-                React.createElement('button', { type: 'button', className: 'si-btn', onClick: () => actions.beginEdit(item.id) }, t('editItem')),
-                React.createElement('button', {
-                  type: 'button',
-                  className: 'si-btn si-btn-danger',
-                  onClick: () => { if (window.confirm(t('deleteConfirm'))) actions.remove(item.id) },
-                }, t('delete'))
-              )
-            )
-          )
-        ),
-        state.form === null
-          ? React.createElement('button', { type: 'button', className: 'si-btn si-btn-primary', onClick: actions.beginCreate }, t('newItem'))
-          : React.createElement('form', {
-            className: 'si-form',
-            onSubmit: (event) => {
-              event.preventDefault()
-              const form = state.form
-              if (!form) return
-              if (!form.title.trim() || !form.prompt.trim() || !form.cron.trim()) {
-                window.alert(t('invalidForm'))
-                return
-              }
-              actions.submit()
-            },
-          },
-            React.createElement('h3', { className: 'si-formTitle' }, state.form.editingId === null ? t('newItem') : t('editItem')),
-            React.createElement('label', { className: 'si-field' },
-              React.createElement('span', null, t('titleLabel')),
-              React.createElement('input', {
-                value: state.form.title,
-                disabled,
-                placeholder: t('titlePlaceholder'),
-                onChange: (e) => actions.setFormField('title', e.target.value),
-              })
-            ),
-            React.createElement('label', { className: 'si-field' },
-              React.createElement('span', null, t('promptLabel')),
-              React.createElement('textarea', {
-                value: state.form.prompt,
-                disabled,
-                rows: 4,
-                placeholder: t('promptPlaceholder'),
-                onChange: (e) => actions.setFormField('prompt', e.target.value),
-              })
-            ),
-            React.createElement('label', { className: 'si-field' },
-              React.createElement('span', null, t('cronLabel')),
-              React.createElement('input', {
-                value: state.form.cron,
-                disabled,
-                placeholder: '0 9 * * *',
-                onChange: (e) => actions.setFormField('cron', e.target.value),
-              }),
-              React.createElement('small', { className: 'si-hint' }, t('cronHint'))
-            ),
-            workspaceOptions && workspaceOptions.length > 0 && React.createElement('label', { className: 'si-field' },
-              React.createElement('span', null, t('workspaceLabel')),
-              React.createElement('select', {
-                value: state.form.workspaceId || '',
-                disabled,
-                onChange: (e) => actions.setFormField('workspaceId', e.target.value === '' ? undefined : e.target.value),
-              },
-                React.createElement('option', { value: '' }, t('workspaceNone')),
-                workspaceOptions.map((option) =>
-                  React.createElement('option', { key: option.id, value: option.id }, option.title))
-              ),
-              React.createElement('small', { className: 'si-hint' }, t('workspaceHint'))
-            ),
-            React.createElement('label', { className: 'si-checkbox' },
-              React.createElement('input', {
-                type: 'checkbox',
-                checked: state.form.enabled,
-                disabled,
-                onChange: (e) => actions.setFormField('enabled', e.target.checked),
-              }),
-              React.createElement('span', null, t('enabledLabel')),
-              React.createElement('small', { className: 'si-hint' }, t('enabledHint'))
-            ),
-            React.createElement('div', { className: 'si-formActions' },
-              React.createElement('button', { type: 'submit', className: 'si-btn si-btn-primary', disabled }, state.saving ? t('saving') : t('save')),
-              React.createElement('button', { type: 'button', className: 'si-btn', disabled, onClick: actions.cancelForm }, t('cancel'))
-            )
-          )
-      )
-    }
-
-    /** Full-page management overlay. */
-    function ScheduledItemsPage({ t, state, actions, workspaceOptions, onClose }) {
-      return React.createElement('div', { className: 'si-page', role: 'dialog', 'aria-modal': 'true' },
-        React.createElement('div', { className: 'si-pageHeader' },
-          React.createElement('h2', { className: 'si-pageTitle' }, t('title')),
-          React.createElement('button', { type: 'button', className: 'si-pageClose', 'aria-label': t('close'), onClick: onClose }, '✕')
-        ),
-        React.createElement('div', { className: 'si-pageBody' },
-          React.createElement(ScheduledItemsPanel, { t, state, actions, workspaceOptions })
-        )
-      )
-    }
-
     module.exports = {
       name: 'scheduled-items-client',
       // Only `slots` is a resolvable service in the static bundle environment;
@@ -325,101 +187,251 @@ window.__ModuleLoader__.load({
           ctx.effect(() => locale.register(LOCALE_NS, LOCALE_DICT))
         }
 
-        // One shared store for both surfaces.
-        const store = {
-          items: [],
-          loading: false,
-          error: null,
-          form: null,
-          saving: false,
-          runningId: null,
-        }
-        const setState = (patch) => { Object.assign(store, patch) }
+        const emptyForm = () => ({ editingId: null, title: '', prompt: '', cron: '', enabled: true })
 
-        const load = async () => {
-          setState({ loading: true, error: null })
-          try {
-            const response = await fetch(API)
-            const payload = await readJson(response)
-            setState({ items: payload.items || [] })
-          } catch (error) {
-            setState({ error: String((error && error.message) || error) })
-          }
-          setState({ loading: false })
-        }
+        /**
+         * The management surface. Component-local state, zero renderer-bound
+         * props hooks: everything (list, form, workspace options, actions) is
+         * reached through the apply closure, so the bundle renders in any client
+         * runtime that serves `slots`.
+         */
+        function ScheduledItemsPanel() {
+          const [items, setItems] = React.useState([])
+          const [loading, setLoading] = React.useState(false)
+          const [error, setError] = React.useState(null)
+          const [form, setForm] = React.useState(null)
+          const [saving, setSaving] = React.useState(false)
+          const [runningId, setRunningId] = React.useState(null)
+          const [workspaces, setWorkspaces] = React.useState([])
 
-        const saveForm = async () => {
-          const form = store.form
-          if (!form || store.saving) return
-          setState({ saving: true, error: null })
-          try {
-            const payload = {
-              title: form.title,
-              prompt: form.prompt,
-              cron: form.cron,
-              enabled: form.enabled,
-              ...(form.workspaceId === undefined ? {} : { workspaceId: form.workspaceId }),
+          const load = async () => {
+            setLoading(true)
+            setError(null)
+            try {
+              const payload = await readJson(await fetch(API))
+              setItems(payload.items || [])
+            } catch (err) {
+              setError(String((err && err.message) || err))
             }
-            const response = form.editingId === null
-              ? await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
-              : await fetch(API, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: form.editingId, ...payload }) })
-            await readJson(response)
-            setState({ form: null })
-            await load()
-          } catch (error) {
-            setState({ error: String((error && error.message) || error) })
+            setLoading(false)
           }
-          setState({ saving: false })
-        }
 
-        const remove = async (id) => {
-          try {
-            const response = await fetch(API, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
-            await readJson(response)
-            await load()
-          } catch (error) {
-            setState({ error: String((error && error.message) || error) })
+          React.useEffect(() => {
+            void load()
+            // Workspace options are optional; failure never blocks the page.
+            fetch(`${API}/workspaces`)
+              .then((response) => readJson(response))
+              .then((payload) => { setWorkspaces(payload.workspaces || []) })
+              .catch(() => {})
+          }, [])
+
+          const saveForm = async () => {
+            if (!form || saving) return
+            setSaving(true)
+            setError(null)
+            try {
+              const payload = {
+                title: form.title,
+                prompt: form.prompt,
+                cron: form.cron,
+                enabled: form.enabled,
+                ...(form.workspaceId === undefined ? {} : { workspaceId: form.workspaceId }),
+              }
+              const response = form.editingId === null
+                ? await fetch(API, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
+                : await fetch(API, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: form.editingId, ...payload }) })
+              await readJson(response)
+              setForm(null)
+              await load()
+            } catch (err) {
+              setError(String((err && err.message) || err))
+            }
+            setSaving(false)
           }
-        }
 
-        const runNow = async (id) => {
-          setState({ runningId: id })
-          try {
-            const response = await fetch(`${API}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
-            await readJson(response)
-            await load()
-          } catch (error) {
-            setState({ error: String((error && error.message) || error) })
+          const remove = async (id) => {
+            try {
+              const response = await fetch(API, { method: 'DELETE', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+              await readJson(response)
+              await load()
+            } catch (err) {
+              setError(String((err && err.message) || err))
+            }
           }
-          setState({ runningId: null })
-        }
 
-        const injected = () => ({
-          hooks: { scheduledItems: store },
-          load,
-          beginCreate: () => setState({ form: { editingId: null, title: '', prompt: '', cron: '', enabled: true } }),
-          beginEdit: (id) => {
-            const row = store.items.find((item) => item.id === id)
-            if (row) setState({
-              form: {
-                editingId: row.id,
-                title: row.title,
-                prompt: row.prompt,
-                cron: row.cron,
-                enabled: row.enabled,
-                ...(row.workspaceId === undefined ? {} : { workspaceId: row.workspaceId }),
+          const runNow = async (id) => {
+            setRunningId(id)
+            try {
+              const response = await fetch(`${API}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) })
+              await readJson(response)
+              await load()
+            } catch (err) {
+              setError(String((err && err.message) || err))
+            }
+            setRunningId(null)
+          }
+
+          const workspaceOptions = workspaces.map((workspace) => ({
+            id: workspace.id,
+            title: workspace.title,
+          }))
+          const workspaceTitle = (id) => {
+            const option = workspaceOptions.find((o) => o.id === id)
+            return option ? option.title : id
+          }
+          const rowMeta = (item) => {
+            const parts = []
+            if (item.workspaceId !== undefined) {
+              parts.push(`${t('workspace')}: ${workspaceTitle(item.workspaceId)}`)
+            }
+            if (!item.enabled) parts.push(`${t('enabledLabel')}: ✕`)
+            parts.push(`${t('lastRun')}: ${lastRunText(t, item)}`)
+            return parts.join(' · ')
+          }
+          const disabled = loading || saving
+
+          return React.createElement('div', { className: 'si-root' },
+            error && React.createElement('p', { className: 'si-error', role: 'alert' },
+              error,
+              React.createElement('button', { type: 'button', className: 'si-btn', onClick: () => void load() }, t('retry'))
+            ),
+            loading && React.createElement('p', { className: 'si-muted' }, t('loading')),
+            !loading && items.length === 0 && !error && React.createElement('p', { className: 'si-muted' }, t('empty')),
+            React.createElement('ul', { className: 'si-list' },
+              items.map((item) =>
+                React.createElement('li', { key: item.id, className: 'si-row' },
+                  React.createElement('div', { className: 'si-rowMain' },
+                    React.createElement('span', { className: 'si-rowTitle' }, item.title),
+                    React.createElement('span', { className: 'si-rowCron' }, item.cron),
+                    React.createElement('span', { className: 'si-rowMeta' }, rowMeta(item))
+                  ),
+                  React.createElement('div', { className: 'si-rowActions' },
+                    React.createElement('button', {
+                      type: 'button',
+                      className: 'si-btn',
+                      disabled: runningId === item.id,
+                      onClick: () => void runNow(item.id),
+                    }, runningId === item.id ? t('running') : t('runNow')),
+                    React.createElement('button', {
+                      type: 'button',
+                      className: 'si-btn',
+                      onClick: () => setForm({
+                        editingId: item.id,
+                        title: item.title,
+                        prompt: item.prompt,
+                        cron: item.cron,
+                        enabled: item.enabled,
+                        ...(item.workspaceId === undefined ? {} : { workspaceId: item.workspaceId }),
+                      }),
+                    }, t('editItem')),
+                    React.createElement('button', {
+                      type: 'button',
+                      className: 'si-btn si-btn-danger',
+                      onClick: () => { if (window.confirm(t('deleteConfirm'))) void remove(item.id) },
+                    }, t('delete'))
+                  )
+                )
+              )
+            ),
+            form === null
+              ? React.createElement('button', { type: 'button', className: 'si-btn si-btn-primary', onClick: () => setForm(emptyForm()) }, t('newItem'))
+              : React.createElement('form', {
+                className: 'si-form',
+                onSubmit: (event) => {
+                  event.preventDefault()
+                  if (!form.title.trim() || !form.prompt.trim() || !form.cron.trim()) {
+                    window.alert(t('invalidForm'))
+                    return
+                  }
+                  void saveForm()
+                },
               },
-            })
-          },
-          cancelForm: () => setState({ form: null, error: null }),
-          setFormField: (field, value) => {
-            if (!store.form) return
-            setState({ form: { ...store.form, [field]: value } })
-          },
-          submit: () => saveForm(),
-          runNow,
-          remove,
-        })
+                React.createElement('h3', { className: 'si-formTitle' }, form.editingId === null ? t('newItem') : t('editItem')),
+                React.createElement('label', { className: 'si-field' },
+                  React.createElement('span', null, t('titleLabel')),
+                  React.createElement('input', {
+                    value: form.title,
+                    disabled,
+                    placeholder: t('titlePlaceholder'),
+                    onChange: (e) => setForm({ ...form, title: e.target.value }),
+                  })
+                ),
+                React.createElement('label', { className: 'si-field' },
+                  React.createElement('span', null, t('promptLabel')),
+                  React.createElement('textarea', {
+                    value: form.prompt,
+                    disabled,
+                    rows: 4,
+                    placeholder: t('promptPlaceholder'),
+                    onChange: (e) => setForm({ ...form, prompt: e.target.value }),
+                  })
+                ),
+                React.createElement('label', { className: 'si-field' },
+                  React.createElement('span', null, t('cronLabel')),
+                  React.createElement('input', {
+                    value: form.cron,
+                    disabled,
+                    placeholder: '0 9 * * *',
+                    onChange: (e) => setForm({ ...form, cron: e.target.value }),
+                  }),
+                  React.createElement('small', { className: 'si-hint' }, t('cronHint'))
+                ),
+                workspaceOptions.length > 0 && React.createElement('label', { className: 'si-field' },
+                  React.createElement('span', null, t('workspaceLabel')),
+                  React.createElement('select', {
+                    value: form.workspaceId || '',
+                    disabled,
+                    onChange: (e) => setForm({ ...form, workspaceId: e.target.value === '' ? undefined : e.target.value }),
+                  },
+                    React.createElement('option', { value: '' }, t('workspaceNone')),
+                    workspaceOptions.map((option) =>
+                      React.createElement('option', { key: option.id, value: option.id }, option.title))
+                  ),
+                  React.createElement('small', { className: 'si-hint' }, t('workspaceHint'))
+                ),
+                React.createElement('label', { className: 'si-checkbox' },
+                  React.createElement('input', {
+                    type: 'checkbox',
+                    checked: form.enabled,
+                    disabled,
+                    onChange: (e) => setForm({ ...form, enabled: e.target.checked }),
+                  }),
+                  React.createElement('span', null, t('enabledLabel')),
+                  React.createElement('small', { className: 'si-hint' }, t('enabledHint'))
+                ),
+                React.createElement('div', { className: 'si-formActions' },
+                  React.createElement('button', { type: 'submit', className: 'si-btn si-btn-primary', disabled }, saving ? t('saving') : t('save')),
+                  React.createElement('button', { type: 'button', className: 'si-btn', disabled, onClick: () => setForm(null) }, t('cancel'))
+                )
+              )
+          )
+        }
+
+        /** Full-page management overlay. */
+        function ScheduledItemsPage() {
+          const [open, setOpen] = React.useState(false)
+          return React.createElement(React.Fragment, null,
+            React.createElement('button', {
+              type: 'button',
+              className: 'si-btn',
+              'aria-label': t('nav'),
+              onClick: () => setOpen(true),
+              style: { display: 'flex', alignItems: 'center', gap: 6 },
+            },
+              React.createElement('span', null, '⏱'),
+              React.createElement('span', null, t('nav'))
+            ),
+            open && React.createElement('div', { className: 'si-page', role: 'dialog', 'aria-modal': 'true' },
+              React.createElement('div', { className: 'si-pageHeader' },
+                React.createElement('h2', { className: 'si-pageTitle' }, t('title')),
+                React.createElement('button', { type: 'button', className: 'si-pageClose', 'aria-label': t('close'), onClick: () => setOpen(false) }, '✕')
+              ),
+              React.createElement('div', { className: 'si-pageBody' },
+                React.createElement(ScheduledItemsPanel, null)
+              )
+            )
+          )
+        }
 
         // Settings page.
         slots.inject('settings.section', () => slots.register(
@@ -429,21 +441,8 @@ window.__ModuleLoader__.load({
             order: 30,
             label: () => t('nav'),
             locale: LOCALE_NS,
-            inject: injected,
           },
-          (props) => {
-            const state = props.useScheduledItems((snapshot) => snapshot)
-            const workspaces = props.useWorkspaces((snapshot) => snapshot)
-            const workspaceOptions = workspaces.items.map((workspace) => ({
-              id: workspace.workspaceId,
-              title: workspace.title,
-            }))
-            return React.createElement('div', { className: 'si-root' },
-              React.createElement('h2', { className: 'si-title' }, t('title')),
-              React.createElement('p', { className: 'si-intro' }, t('intro')),
-              React.createElement(ScheduledItemsPanel, { t, state, actions: props, workspaceOptions })
-            )
-          }
+          () => React.createElement(ScheduledItemsPanel, null)
         ))
 
         // Sidebar footer action: full-page management overlay.
@@ -453,45 +452,10 @@ window.__ModuleLoader__.load({
             id: 'scheduled-items',
             order: 30,
             locale: LOCALE_NS,
-            inject: injected,
           },
-          (props) => {
-            const state = props.useScheduledItems((snapshot) => snapshot)
-            const workspaces = props.useWorkspaces((snapshot) => snapshot)
-            const workspaceOptions = workspaces.items.map((workspace) => ({
-              id: workspace.workspaceId,
-              title: workspace.title,
-            }))
-            return React.createElement(FooterAction, { t, state, actions: props, workspaceOptions, wide: props.wide })
-          }
+          () => React.createElement(ScheduledItemsPage, null)
         ))
-
-        void load()
       },
-    }
-
-    /** Footer trigger + full-page overlay holder. */
-    function FooterAction({ t, state, actions, workspaceOptions, wide }) {
-      const [open, setOpen] = React.useState(false)
-      return React.createElement(React.Fragment, null,
-        React.createElement('button', {
-          type: 'button',
-          className: 'si-btn',
-          'aria-label': t('nav'),
-          onClick: () => setOpen(true),
-          style: { display: 'flex', alignItems: 'center', gap: 6 },
-        },
-          React.createElement('span', null, '⏱'),
-          wide && React.createElement('span', null, t('nav'))
-        ),
-        open && React.createElement(ScheduledItemsPage, {
-          t,
-          state,
-          actions,
-          workspaceOptions,
-          onClose: () => setOpen(false),
-        })
-      )
     }
 
     return module.exports
