@@ -113,40 +113,82 @@ const styles = {
 }
 
 styles.insert(`
-.si-root{display:flex;flex-direction:column;gap:14px;width:100%;max-width:760px;color:var(--dsw-alias-label-primary,#e8e8e8)}
+/*
+ * Theme-aware styles for dsh-plugin-scheduled-items.
+ *
+ * Every color comes from the harness theme tokens (Theme.listTokens). Tokens
+ * that do not exist there (button-primary-fill / interactive-bg-hover /
+ * label-tertiary / bg-layer-3 / label-dimmed / font-mono / etc.) are derived
+ * from real tokens through CSS color-mix(), so buttons follow light/dark
+ * switching automatically without any local fallback palette.
+ *
+ * Buttons by role:
+ *   .si-btn            — secondary / outline / ghost, all uses color-mix
+ *   .si-btn-primary    — "新建定时任务" / "保存" / form submit; brand accent
+ *   .si-btn-danger     — "删除"; error-state tint
+ *   .si-pageClose      — header close "✕"; ghost with hover overlay
+ *   .si-form input, select, textarea — surface-2 surface, label-primary text
+ *
+ * Hover / active overlays are always color-mixed from the base token, so
+ * they stay consistent in light, dark, and any custom theme.
+ */
+.si-root{display:flex;flex-direction:column;gap:14px;width:100%;max-width:760px;color:var(--dsw-alias-label-primary)}
 .si-title{font-size:20px;font-weight:600;margin:0}
-.si-intro{font-size:13px;color:var(--dsw-alias-label-tertiary,#999);margin:0}
-.si-muted{font-size:13px;color:var(--dsw-alias-label-tertiary,#999);margin:0}
-.si-error{font-size:13px;color:var(--dsw-alias-state-error-primary,#ef4444);display:flex;align-items:center;gap:8px;margin:0}
+.si-intro{font-size:13px;color:var(--dsw-alias-label-secondary);margin:0}
+.si-muted{font-size:13px;color:var(--dsw-alias-label-secondary);margin:0}
+.si-error{font-size:13px;color:var(--dsw-alias-state-error-primary);display:flex;align-items:center;gap:8px;margin:0}
 .si-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.si-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--dsw-alias-border-l2,#444);border-radius:12px;background:var(--dsw-alias-bg-layer-3,#1c1c1c);transition:border-color .16s,background .16s}
-.si-row:hover{border-color:var(--dsw-alias-label-dimmed,#777);background:var(--dsw-alias-bg-layer-2,#242424)}
+.si-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2);transition:border-color .16s,background .16s}
+.si-row:hover{border-color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-1)}
 .si-rowMain{display:flex;flex-direction:column;gap:3px;min-width:0}
-.si-rowTitle{font-size:14px;font-weight:600}
-.si-rowCron{font-size:12px;font-family:var(--dsw-font-mono,monospace);color:var(--dsw-alias-label-secondary,#bbb)}
-.si-rowMeta{font-size:12px;color:var(--dsw-alias-label-tertiary,#999)}
+.si-rowTitle{font-size:14px;font-weight:600;color:var(--dsw-alias-label-primary)}
+.si-rowCron{font-size:12px;color:var(--dsw-alias-label-secondary);font-feature-settings:"tnum" 1}
+.si-rowMeta{font-size:12px;color:var(--dsw-alias-label-secondary)}
 .si-rowActions{display:flex;gap:8px;flex-shrink:0}
-.si-btn{font-size:13px;padding:5px 10px;border-radius:7px;border:1px solid var(--dsw-alias-border-l2,#555);background:transparent;color:var(--dsw-alias-label-primary,#e8e8e8);cursor:pointer}
-.si-btn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.12))}
+
+/* Base button: secondary outline. Hover overlay mixes from label-primary so
+   light/dark themes both produce a visible but subtle state change. */
+.si-btn{font-size:13px;padding:5px 10px;border-radius:7px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;transition:background .16s,border-color .16s,color .16s}
+.si-btn:hover:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 10%,transparent);border-color:color-mix(in srgb,var(--dsw-alias-label-primary) 24%,var(--dsw-alias-border-l2))}
+.si-btn:active:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 18%,transparent)}
 .si-btn:disabled{opacity:.5;cursor:default}
-.si-btn-primary{border-color:transparent;background:var(--dsw-alias-button-primary-fill,#4f8cff);color:#fff}
-.si-btn-primary:hover:not(:disabled){background:var(--dsw-alias-button-primary-hover,#3f78e8)}
-.si-btn-danger{color:var(--dsw-alias-state-error-primary,#ef4444)}
-.si-btn-danger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover-danger,rgba(239,68,68,.14))}
-.si-form{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--dsw-alias-border-l2,#444);border-radius:12px;background:var(--dsw-alias-bg-layer-3,#1c1c1c)}
-.si-formTitle{font-size:15px;font-weight:600;margin:0}
-.si-field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--dsw-alias-label-secondary,#bbb)}
-.si-field input,.si-field textarea,.si-field select{padding:8px 10px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2,#444);background:var(--dsw-alias-bg-layer-2,#242424);color:var(--dsw-alias-label-primary,#e8e8e8);font-size:13px;font-family:inherit}
+
+/* Primary button: brand-accent fill. Foreground stays label-primary so it
+   reads as "on-brand" against either light or dark brand colors. */
+.si-btn-primary{border-color:transparent;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font-weight:600}
+.si-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 14%,var(--dsw-alias-brand-primary));border-color:transparent}
+.si-btn-primary:active:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 24%,var(--dsw-alias-brand-primary))}
+
+/* Danger button: error-state tint for text + a derived hover surface. */
+.si-btn-danger{color:var(--dsw-alias-state-error-primary);border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 32%,var(--dsw-alias-border-l2))}
+.si-btn-danger:hover:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 12%,transparent);border-color:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-state-error-primary)}
+.si-btn-danger:active:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 20%,transparent)}
+
+.si-form{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2)}
+.si-formTitle{font-size:15px;font-weight:600;margin:0;color:var(--dsw-alias-label-primary)}
+.si-field{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--dsw-alias-label-secondary)}
+.si-field input,.si-field textarea,.si-field select{padding:8px 10px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:13px;font-family:inherit;transition:border-color .16s,background .16s}
+.si-field input:focus,.si-field textarea:focus,.si-field select:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
 .si-field textarea{resize:vertical;min-height:72px}
-.si-hint{font-size:12px;color:var(--dsw-alias-label-tertiary,#999)}
-.si-checkbox{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dsw-alias-label-secondary,#bbb)}
+.si-hint{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.si-checkbox{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dsw-alias-label-secondary)}
 .si-formActions{display:flex;gap:8px}
-.si-page{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1,#141414)}
-.si-pageHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border-bottom:1px solid var(--dsw-alias-border-l2,#444);background:var(--dsw-alias-bg-layer-2,#242424);flex-shrink:0}
-.si-pageTitle{font-size:17px;font-weight:600;margin:0}
-.si-pageClose{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary,#bbb);cursor:pointer}
-.si-pageClose:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(128,128,128,.12))}
+.si-page{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;background:var(--dsw-alias-bg-layer-1)}
+.si-pageHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);flex-shrink:0}
+.si-pageTitle{font-size:17px;font-weight:600;margin:0;color:var(--dsw-alias-label-primary)}
+.si-pageClose{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border:none;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;transition:background .16s,color .16s}
+.si-pageClose:hover{background:color-mix(in srgb,var(--dsw-alias-label-primary) 12%,transparent);color:var(--dsw-alias-label-primary)}
 .si-pageBody{flex:1;overflow:auto;padding:24px 20px;display:flex;justify-content:center}
+
+/* Sidebar footer trigger: renders inside the sidebar footer Slot, so it must
+   read as a sidebar row, not a surface card. The base text follows
+   label-primary; hover lifts the background with a theme-derived overlay and
+   swaps the text color so it remains readable on either light or dark theme. */
+.si-sidebarTrigger{display:flex;align-items:center;gap:6px;width:100%;padding:8px 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--dsw-alias-label-primary);font-size:13px;text-align:left;cursor:pointer;transition:background .16s,border-color .16s,color .16s}
+.si-sidebarTrigger:hover:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 10%,transparent);border-color:color-mix(in srgb,var(--dsw-alias-label-primary) 18%,transparent)}
+.si-sidebarTrigger:active:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 18%,transparent)}
+.si-sidebarTrigger:focus-visible{outline:none;border-color:var(--dsw-alias-brand-primary)}
+.si-sidebarTriggerIcon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;color:var(--dsw-alias-label-secondary);font-size:14px;line-height:1}
 `)
 
 async function readJson(response) {
@@ -403,12 +445,11 @@ module.exports = {
       return React.createElement(React.Fragment, null,
         React.createElement('button', {
           type: 'button',
-          className: 'si-btn',
+          className: 'si-sidebarTrigger',
           'aria-label': t('nav'),
           onClick: () => setOpen(true),
-          style: { display: 'flex', alignItems: 'center', gap: 6 },
         },
-          React.createElement('span', null, '⏱'),
+          React.createElement('span', { className: 'si-sidebarTriggerIcon', 'aria-hidden': 'true' }, '⏱'),
           React.createElement('span', null, t('nav'))
         ),
         open && React.createElement('div', { className: 'si-page', role: 'dialog', 'aria-modal': 'true' },
