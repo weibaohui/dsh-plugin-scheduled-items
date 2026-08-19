@@ -83,7 +83,7 @@ function buildRecord(input) {
 
 module.exports = {
   name: 'scheduled-items',
-  inject: ['storageDomain', 'agents', 'agentDefaultModel', 'webServer', 'workspaceRegistry'],
+  inject: ['storageDomain', 'agents', 'agentDefaultModel', 'webServer', 'workspaceRegistry', 'sessionTitle'],
 
   // Exposed for the offline test suite only (test/*.test.mjs); Cordis
   // ignores unknown export properties.
@@ -165,6 +165,21 @@ module.exports = {
         })
         if (workspace !== undefined) {
           await workspace.attachSession(sessionId)
+        }
+        // Set the session title to the item's title with a 4-digit suffix so the
+        // sidebar shows a unique, differentiated label. Append directly to the
+        // session log with a 'user' source, which pins the title and prevents
+        // automatic title generation from overwriting it.
+        try {
+          const suffix = String(Math.floor(1000 + Math.random() * 9000))
+          handle.agent.session.append('session/title', {
+            title: `${record.title} [${suffix}]`,
+            messageSeqs: [],
+            source: { kind: 'user' },
+          })
+        } catch {
+          // A failed append is non-fatal; the session still runs with a
+          // fallback title derived from the first prompt.
         }
         const message = {
           id: randomUUID(),
