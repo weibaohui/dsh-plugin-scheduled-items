@@ -163,11 +163,16 @@ window.__ModuleLoader__.load({
     .si-btn:active:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 18%,transparent)}
     .si-btn:disabled{opacity:.5;cursor:default}
 
-    /* Primary button: brand-accent fill. Foreground stays label-primary so it
-       reads as "on-brand" against either light or dark brand colors. */
-    .si-btn-primary{border-color:transparent;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-bg-base);font-weight:600}
-    .si-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 14%,var(--dsw-alias-brand-primary));border-color:transparent}
-    .si-btn-primary:active:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-label-primary) 24%,var(--dsw-alias-brand-primary))}
+    /* Primary button: the only color pair we can guarantee has contrast in any
+       theme is foreground text ('label-primary') vs. background surface
+       ('bg-base'). 'brand-primary' is theme-dependent — in some themes it is
+       itself very light, which would collapse button foreground and background
+       to the same color and make the label invisible. So the primary button is
+       a solid 'label-primary' fill with 'bg-base' text — guaranteed readable
+       in light, dark, and any custom theme. */
+    .si-btn-primary{border-color:transparent;background:var(--dsw-alias-label-primary);color:var(--dsw-alias-bg-base);font-weight:600}
+    .si-btn-primary:hover:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-bg-base) 14%,var(--dsw-alias-label-primary));border-color:transparent}
+    .si-btn-primary:active:not(:disabled){background:color-mix(in srgb,var(--dsw-alias-bg-base) 24%,var(--dsw-alias-label-primary))}
 
     /* Danger button: error-state tint for text + a derived hover surface. */
     .si-btn-danger{color:var(--dsw-alias-state-error-primary);border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 32%,var(--dsw-alias-border-l2))}
